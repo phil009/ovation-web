@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* `dark:` matches a forced dark theme, or the system dark theme unless light is forced. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-on-success: var(--on-success);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-pledged-bg: var(--pledged-bg);
+  --color-pledged-fg: var(--pledged-fg);
+  --color-received-bg: var(--received-bg);
+  --color-received-fg: var(--received-fg);
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  html {
+    /* 17px base, expressed relative to the user's browser setting so font scaling works. */
+    font-size: 106.25%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+
+  /* One visible focus style everywhere: 2px ring, 2px offset, at least 3:1 on every background. */
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* The page h1 receives focus after navigation; it needs no ring for that programmatic focus. */
+  h1[tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 3px solid CanvasText;
+    }
+    .ov-border {
+      border-color: CanvasText;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}

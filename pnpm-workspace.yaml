@@ -1,0 +1,6 @@
+# Install scripts are blocked by default (pnpm 10). Only approve packages that truly need one.
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+  - "@swc/core"
+  - esbuild

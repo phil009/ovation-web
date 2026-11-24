@@ -1,0 +1,9 @@
+src/sdk
+pnpm-lock.yaml
+.next
+coverage
+playwright-report
+test-results
+public/sw.js
+docs/backend-README.md
+AGENTS.md

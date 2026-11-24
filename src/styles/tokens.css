@@ -1,0 +1,84 @@
+/*
+ * Ovation design tokens. The single source of truth for colour.
+ * src/styles/contrast.test.ts parses this file and checks every pairing (WCAG 2.2 AA).
+ *
+ * Theme selection: `data-theme="light" | "dark"` on <html> forces a theme; without it the
+ * system preference applies. The two dark blocks must stay identical (the test checks this).
+ */
+
+/* @theme light */
+:root {
+  color-scheme: light;
+  --bg: #faf7f0;
+  --surface: #ffffff;
+  --text: #1b1b2f;
+  --text-muted: #5b5b70;
+  --primary: #2e2a72;
+  --on-primary: #ffffff;
+  --accent: #f2b63d;
+  --on-accent: #1b1b2f;
+  --success: #1f7a4d;
+  --on-success: #ffffff;
+  --danger: #b3261e;
+  --on-danger: #ffffff;
+  --pledged-bg: #fff1d6;
+  --pledged-fg: #8a4b00;
+  --received-bg: #dff3e8;
+  --received-fg: #14573a;
+  --border: #7a7890;
+  --divider: #e4e0d6;
+  --ring: #2e2a72;
+}
+/* @end */
+
+@media (prefers-color-scheme: dark) {
+  /* @theme dark-system */
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #12121c;
+    --surface: #1c1c2b;
+    --text: #f1f0fa;
+    --text-muted: #a3a3ba;
+    --primary: #b4b0f5;
+    --on-primary: #12121c;
+    --accent: #f2b63d;
+    --on-accent: #1b1b2f;
+    --success: #6fd3a0;
+    --on-success: #12121c;
+    --danger: #ff8a80;
+    --on-danger: #12121c;
+    --pledged-bg: #3d2a08;
+    --pledged-fg: #ffd08a;
+    --received-bg: #0f3323;
+    --received-fg: #8ee0b5;
+    --border: #8a88a3;
+    --divider: #2c2c40;
+    --ring: #b4b0f5;
+  }
+  /* @end */
+}
+
+/* @theme dark */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12121c;
+  --surface: #1c1c2b;
+  --text: #f1f0fa;
+  --text-muted: #a3a3ba;
+  --primary: #b4b0f5;
+  --on-primary: #12121c;
+  --accent: #f2b63d;
+  --on-accent: #1b1b2f;
+  --success: #6fd3a0;
+  --on-success: #12121c;
+  --danger: #ff8a80;
+  --on-danger: #12121c;
+  --pledged-bg: #3d2a08;
+  --pledged-fg: #ffd08a;
+  --received-bg: #0f3323;
+  --received-fg: #8ee0b5;
+  --border: #8a88a3;
+  --divider: #2c2c40;
+  --ring: #b4b0f5;
+}
+/* @end */

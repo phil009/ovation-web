@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+src/sdk/** linguist-generated=true -diff
