@@ -1,24 +1,25 @@
 # Roadmap
 
-M0 (foundation) and M1 (auth and organisations) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
+M0 (foundation), M1 (auth and organisations) and M2 (events, awardees, totals and admin screens) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
 
-## M2: Events, awardees, summary, then admin screens
+## M2: Events, awardees, summary, then admin screens (built)
 
-**Read and create**
+What was built, and where it differs from the plan:
 
-- `/orgs/[orgId]`: the events list (`GET /orgs/{orgId}/events`, newest first). Editors and admins get "New event" (`POST`, `{ name, date }`).
-- `/orgs/[orgId]/events/[eventId]`:
-  - the event header;
-  - the awardee list (`GET /events/{id}/awardees`, notebook-number order);
-  - "Add awardee" for editors (`{ name, number?, amountKobo?, paymentMode? }`).
-- **Summary:** `GET /events/{id}/summary` as a real `<table>` with a caption and `th scope`. Totals use `<Money>` (formatted for display, spoken as "… naira").
-- **Closed events:** show a "Closed" banner and hide write controls. Admins get Close and Reopen. Handle 409 on writes to a closed event.
-
-**Admin (gated in the UI by `useRole`; the API enforces it)**
-
-- **Members:** list, change role (409 on the last admin), remove, leave.
-- **Invites:** create (role, max uses, expiry) and show the code large with a copy button and a WhatsApp share link (`https://wa.me/?text=` is a link, not a script). List with status and revoke.
-- **Audit log:** a paginated table (limit/offset), filterable by entity and user.
+- **Events:** the list (newest first) and "New event" for editors and admins.
+- **The event page:**
+  - the header, with a "Closed" badge and banner;
+  - Close and Reopen for admins, each behind a confirmation;
+  - the totals table (`<table>` with a caption and `th scope`) and the event totals;
+  - "Add awardee" inline for editors while the event is open;
+  - Edit (its own page) and Delete for admins. Deleting an awardee that has donations explains the 409.
+- **Admin pages:**
+  - Members: change role, remove, and the last-admin 409 explained.
+  - Invite codes: create, then a large code with Copy and a WhatsApp link, plus the list with status and Revoke.
+  - Audit log: filter by what changed and by who, 50 a page, with before and after per field.
+- **Leaving:** "Leave organisation" is on the events page for every role, not only on the admin-only Members page.
+- **Not built:** renaming the organisation (`PATCH /orgs/{orgId}`). It's a small form; add it with the M5 polish.
+- **Tests:** `e2e/m2.spec.ts` covers an admin and a viewer, with axe and a no-sideways-scroll check on every page.
 
 ## M3: The entry screen (online only)
 
@@ -88,4 +89,4 @@ Rules:
 - Forgot password and email verification. Until then the login page says recovery is unavailable.
 - Transfer confirmation fields (reference, sender bank, confirmed by and at).
 - Account and organisation deletion. Billing.
-- Fix the Swagger type for `CreateDonationDto.awardeeId`: it is generated as an object, not a uuid string.
+- Known backend bugs and contract gaps: see [BACKEND-ISSUES.md](BACKEND-ISSUES.md).

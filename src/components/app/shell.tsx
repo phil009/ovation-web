@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Building2, Check, ChevronDown, Download, LogOut, Settings, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Check,
+  ChevronDown,
+  Download,
+  LogOut,
+  Settings,
+  UserRound,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -224,6 +233,19 @@ export function LinkButton({
 }) {
   return (
     <Link href={href} className={cn(buttonVariants({ variant }), className)}>
+      {children}
+    </Link>
+  );
+}
+
+/** "← All events" style link back up the hierarchy. */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="mb-4 inline-flex min-h-12 items-center gap-2 font-semibold text-primary underline-offset-4 hover:underline"
+    >
+      <ArrowLeft aria-hidden className="size-5" />
       {children}
     </Link>
   );

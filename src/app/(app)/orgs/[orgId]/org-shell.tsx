@@ -132,6 +132,13 @@ export function AdminOnly({ title, children }: { title: string; children: ReactN
   return <>{children}</>;
 }
 
+/** The organisation id from the URL and the caller's role in it (from /auth/me or the org). */
+export function useOrgRole(): { orgId: string; role: Role | undefined } {
+  const { orgId } = useParams<{ orgId: string }>();
+  const org = useOrg(orgId);
+  return { orgId, role: useRole(orgId) ?? org.data?.myRole };
+}
+
 export function OrgName() {
   const { orgId } = useParams<{ orgId: string }>();
   const org = useOrg(orgId);

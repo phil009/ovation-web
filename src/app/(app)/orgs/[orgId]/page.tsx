@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { strings } from "@/lib/strings";
-import { EventsPlaceholder } from "./placeholders";
+import { EventsView } from "./events-view";
 
 export const metadata: Metadata = { title: strings.org.events };
 
 export default function OrgPage() {
-  return <EventsPlaceholder />;
+  return <EventsView />;
 }

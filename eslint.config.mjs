@@ -23,6 +23,8 @@ const eslintConfig = defineConfig([
       // label-has-associated-control (either is fine) stays on as an error.
       "jsx-a11y/label-has-for": "off",
       "jsx-a11y/label-has-associated-control": ["error", { assert: "either" }],
+      // Scrollable table wrappers are focusable labelled regions (axe: scrollable-region-focusable).
+      "jsx-a11y/no-noninteractive-tabindex": ["error", { tags: [], roles: ["tabpanel", "region"] }],
       "react/no-danger": "error",
       "no-eval": "error",
       "no-implied-eval": "error",
