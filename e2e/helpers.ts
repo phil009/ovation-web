@@ -64,3 +64,12 @@ export async function seedOrgWithInvite(
   const { code } = (await invite.json()) as { code: string };
   return { orgId, orgName, code };
 }
+
+/** WCAG 1.4.10 reflow: the page itself never scrolls sideways (wide tables scroll inside). */
+export async function expectNoHorizontalScroll(page: Page) {
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth, "page scrolls sideways").toBeLessThanOrEqual(clientWidth);
+}

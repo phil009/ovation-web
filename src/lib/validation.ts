@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { components } from "@/sdk";
+import { isCalendarDay } from "./dates";
+import { parseNairaInput, type NairaParseResult } from "./money";
 import { strings } from "./strings";
 
 // No JIT: zod would probe `new Function`, which the CSP (no unsafe-eval) blocks and reports.
@@ -62,3 +65,108 @@ export const joinSchema = z.object({
     .refine((c) => /^[A-Z0-9]{6,20}$/.test(normaliseInviteCode(c)), v.codeInvalid),
 });
 export type JoinValues = z.infer<typeof joinSchema>;
+
+// ---- events ------------------------------------------------------------------------------
+
+export const eventSchema = z.object({
+  // The backend requires 2 characters and sets no maximum yet (docs/BACKEND-ISSUES.md).
+  name: z
+    .string()
+    .trim()
+    .min(1, v.eventNameRequired)
+    .min(2, v.eventNameTooShort)
+    .max(200, v.eventNameTooLong),
+  date: z
+    .string()
+    .min(1, v.dateRequired)
+    .refine((value) => isCalendarDay(value), v.dateInvalid),
+});
+export type EventValues = z.infer<typeof eventSchema>;
+
+// ---- awardees ----------------------------------------------------------------------------
+
+export const PAYMENT_MODES = ["CASH", "TRANSFER", "PLEDGE"] as const;
+export type PaymentMode = components["schemas"]["PaymentMode"];
+
+/** "" (or "0") means no own donation. Otherwise a naira amount that parseNairaInput accepts. */
+function optionalAmount(raw: string): NairaParseResult | null {
+  const trimmed = raw.trim();
+  if (trimmed === "" || /^0+$/.test(trimmed)) return null;
+  return parseNairaInput(trimmed);
+}
+
+/** Form values stay strings; `awardeeBody` turns them into the API body. */
+export const awardeeSchema = z.object({
+  number: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || /^\d{1,9}$/.test(value), v.numberInvalid),
+  name: z.string().trim().min(1, v.awardeeNameRequired).max(200, v.awardeeNameTooLong),
+  amount: z.string().superRefine((value, ctx) => {
+    const parsed = optionalAmount(value);
+    if (parsed && !parsed.ok)
+      ctx.addIssue({ code: "custom", message: strings.money[parsed.error] });
+  }),
+  paymentMode: z.enum(PAYMENT_MODES),
+});
+export type AwardeeValues = z.infer<typeof awardeeSchema>;
+
+export type AwardeeBody = components["schemas"]["CreateAwardeeDto"];
+
+/**
+ * The create or update body. A blank number or amount is left out on create. On update, a
+ * cleared amount is sent as "0" (the backend has no way to unset it), and the payment mode
+ * only goes with an amount.
+ */
+export function awardeeBody(values: AwardeeValues, mode: "create" | "update"): AwardeeBody {
+  const parsed = optionalAmount(values.amount);
+  const body: AwardeeBody = { name: values.name.trim() };
+  const number = values.number.trim();
+  if (number !== "") body.number = Number.parseInt(number, 10);
+  if (parsed?.ok) {
+    body.amountKobo = parsed.kobo;
+    body.paymentMode = values.paymentMode;
+  } else if (mode === "update") {
+    body.amountKobo = "0";
+  }
+  return body;
+}
+
+/** Turns a kobo string back into what the amount field shows when editing. */
+export function koboToNairaInput(kobo: string): string {
+  if (!/^\d+$/.test(kobo) || /^0+$/.test(kobo)) return "";
+  const value = BigInt(kobo);
+  const naira = (value / 100n).toString();
+  const rest = value % 100n;
+  // Whole naira only in the input; kobo remainders cannot come from this app.
+  return rest === 0n ? naira : `${naira}.${rest.toString().padStart(2, "0")}`;
+}
+
+// ---- invite codes ------------------------------------------------------------------------
+
+export const INVITE_ROLES = ["EDITOR", "VIEWER"] as const;
+
+export const inviteSchema = z.object({
+  role: z.enum(INVITE_ROLES),
+  maxUses: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || (/^\d{1,4}$/.test(value) && +value >= 1 && +value <= 1000),
+      v.maxUsesInvalid,
+    ),
+  expiresInDays: z
+    .string()
+    .trim()
+    .refine((value) => /^\d{1,2}$/.test(value) && +value >= 1 && +value <= 90, v.expiresInvalid),
+});
+export type InviteValues = z.infer<typeof inviteSchema>;
+
+export function inviteBody(values: InviteValues): components["schemas"]["CreateInviteDto"] {
+  const body: components["schemas"]["CreateInviteDto"] = {
+    role: values.role,
+    expiresInDays: Number.parseInt(values.expiresInDays, 10),
+  };
+  if (values.maxUses.trim() !== "") body.maxUses = Number.parseInt(values.maxUses, 10);
+  return body;
+}

@@ -67,3 +67,21 @@ The prompt says query keys start with `['org', orgId, …]`. Data that belongs t
 ## 10. Brand assets
 
 The app icons are rendered from `public/icons/ovation-app-icon*.svg` by `scripts/render-icons.mjs`, using Playwright's Chromium. The header shows the colour lockup, or the reversed lockup in dark mode. Favicons come from `favicon.svg` and `favicon.ico`.
+
+## 11. Event dates are shown in UTC
+
+The API takes an event date as `YYYY-MM-DD` and returns it as midnight UTC (`2026-11-08T00:00:00.000Z`). It is a calendar day, not a moment, so `formatEventDate` formats it with `timeZone: "UTC"`. Local time would show the previous day to anyone west of Greenwich, including the diaspora in the US. Moments (the audit log, invite expiry, joined dates) use the viewer's own time zone. The new-event form defaults to today in the viewer's time zone.
+
+## 12. The event page reads the summary, not the awardee list
+
+`GET /events/{id}/summary` returns every awardee that hasn't been deleted, with number, name, payment mode and totals, so the event page needs one request instead of two. The awardee list (`GET /events/{id}/awardees`) is only used on the edit page, which needs `amountKobo` and `paymentMode` as stored. Totals are never added up in the browser.
+
+## 13. Editing an awardee is a page, not a dialog
+
+Edit opens `/orgs/{orgId}/events/{eventId}/awardees/{awardeeId}`. On a phone a full page has more room, works with the back button, and moves focus to its heading the same way as every other route. Adding awardees stays inline on the event page, because organisers add many in a row. After each one the form clears, keeps the payment mode, suggests the next notebook number and puts focus back on the name.
+
+Awardee forms keep their values as strings and convert them in `awardeeBody` (tested): an empty amount or `0` leaves the amount out on create. On update it sends `"0"`, because the API has no way to unset an amount. The payment mode is sent only with an amount.
+
+## 14. Wide tables scroll inside a focusable region
+
+The totals and audit tables are real `<table>`s, which are too wide for a phone. They sit in `ScrollRegion`, which is `role="region"`, labelled by the table caption, `tabIndex={0}` so keyboard users can scroll it (axe: scrollable-region-focusable), and `position: relative`. That last part matters. Screen-reader-only text is absolutely positioned, and without a positioned ancestor it escapes the scroll box and widens the whole page on phones. The M2 end-to-end tests now fail if any page scrolls sideways. jsx-a11y's `no-noninteractive-tabindex` allows the `region` role for this.
