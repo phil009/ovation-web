@@ -45,13 +45,16 @@ export interface AuditFilters {
 export const AUDIT_PAGE_SIZE = 50;
 
 export interface DonationFilters {
+  /** One awardee, or "general" for donations with no awardee. */
   awardeeId?: string;
+  order?: "asc" | "desc";
   offset: number;
 }
 
+/** The donations filter value (and ?awardee=) for general donations. */
+export const GENERAL_FILTER = "general";
+
 export const DONATIONS_PAGE_SIZE = 100;
-/** The API's largest page. Donor-name suggestions read the first page of this size. */
-export const DONATIONS_MAX_PAGE = 500;
 
 export const eventsQuery = (orgId: string) =>
   queryOptions({
@@ -110,7 +113,10 @@ export const donationsQuery = (orgId: string, eventId: string, filters: Donation
           params: {
             query: {
               eventId,
-              awardeeId: filters.awardeeId,
+              ...(filters.awardeeId === GENERAL_FILTER
+                ? { general: true }
+                : { awardeeId: filters.awardeeId }),
+              order: filters.order,
               limit: DONATIONS_PAGE_SIZE,
               offset: filters.offset,
             },
@@ -120,26 +126,15 @@ export const donationsQuery = (orgId: string, eventId: string, filters: Donation
       ),
   });
 
-/**
- * Donor names already used at this event, for autocomplete. Reads the first 500 donations
- * (the API's largest page); later names are not suggested.
- */
+/** Every donor name already used at this event, sorted, for autocomplete. */
 export const donorNamesQuery = (orgId: string, eventId: string) =>
   queryOptions({
     queryKey: keys.donorNames(orgId, eventId),
     queryFn: async () => {
-      const page = await call((signal) =>
-        api.GET("/api/donations", {
-          params: { query: { eventId, limit: DONATIONS_MAX_PAGE, offset: 0 } },
-          signal,
-        }),
+      const { names } = await call((signal) =>
+        api.GET("/api/events/{eventId}/donor-names", { params: { path: { eventId } }, signal }),
       );
-      const names = new Map<string, string>();
-      for (const d of page.items) {
-        const key = d.donorName.trim().toLocaleLowerCase("en-GB");
-        if (!names.has(key)) names.set(key, d.donorName.trim());
-      }
-      return [...names.values()].sort((a, b) => a.localeCompare(b, "en-GB"));
+      return names;
     },
     staleTime: 60_000,
   });
@@ -190,6 +185,23 @@ export const auditQuery = (orgId: string, filters: AuditFilters) =>
         }),
       ),
   });
+
+/**
+ * No answer because there is no connection: paused while the browser says offline, or the
+ * last attempt failed on the network (also while retrying, and on Wi-Fi with no internet).
+ * Only for queries without data: with data, the page shows what it has.
+ */
+export function isUnreachable(query: {
+  data: unknown;
+  fetchStatus: string;
+  error: unknown;
+  failureReason: unknown;
+}): boolean {
+  if (query.data !== undefined) return false;
+  if (query.fetchStatus === "paused") return true;
+  const reason = query.error ?? query.failureReason;
+  return isApiError(reason) && reason.retriable;
+}
 
 /** A 409 because the event is closed (the backend says "This event is closed"). */
 export function isClosedEventConflict(error: unknown): boolean {

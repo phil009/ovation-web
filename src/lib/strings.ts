@@ -91,7 +91,8 @@ export const strings = {
     title: "You are offline",
     body: "Ovation needs a connection for this page. Your work on this device is safe. Reconnect and try again.",
     retry: "Try again",
-    banner: "You are offline. Changes cannot be saved until you reconnect.",
+    banner:
+      "You are offline. Donations you record are saved on this phone and sent when you reconnect.",
   },
 
   login: {
@@ -108,6 +109,8 @@ export const strings = {
       "Forgot your password? Password recovery is not available yet. Ask your organisation's admin for help.",
     sessionExpired: "Your session ended. Please sign in again.",
     signedOut: "You have signed out.",
+    unsent: (n: number) =>
+      `${n === 1 ? "1 donation" : `${n} donations`} saved on this phone ${n === 1 ? "is" : "are"} waiting to be sent. Sign in with the account that recorded ${n === 1 ? "it" : "them"}, and ${n === 1 ? "it is" : "they are"} sent straight away.`,
   },
 
   register: {
@@ -288,6 +291,7 @@ export const strings = {
       number === null ? name : `${number}. ${name}`,
     recordingFor: "Recording for",
     totalSoFar: "Total so far",
+    notSentYet: (amount: string) => `plus ${amount} not sent yet`,
     totalAnnounce: (who: string, spoken: string) => `${who}: total so far ${spoken}.`,
     donorName: "Donor's name",
     donorHint: "Names already used at this event are suggested.",
@@ -307,20 +311,91 @@ export const strings = {
     undoLabel: (amount: string, donor: string) => `Undo ${amount} from ${donor}`,
     undone: (amount: string, donor: string) => `Removed ${amount} from ${donor}.`,
     undoFailed: "Could not undo. Open the donations list to fix it.",
-    olderVersion: (amount: string, donor: string) =>
-      `An earlier version of this entry was already saved (${amount} from ${donor}). Your form still has the new details: save again to add them as a separate donation.`,
-    offlineError:
-      "You are offline, so this donation was not saved. What you typed is kept on this phone. Save again when you are back online.",
-    statusOnline: "Online. Each donation is saved as soon as you press Save.",
-    statusSaving: "Saving…",
-    statusOffline: "Offline. Donations cannot be saved until you reconnect.",
+    undoTooLate:
+      "Too late to undo this one: entries can be undone for 10 minutes. Ask an admin to correct it.",
     draftRestored: "We brought back what you were typing before.",
+    storageFailed:
+      "This phone could not save the donation (its storage may be full). Write it down, free some space, then try again.",
     recent: "Saved on this phone just now",
     recentEmpty: "Donations you save here are listed for a quick check.",
-    editorsCannotUndo:
-      'Made a mistake? Tick "Check this entry later" next time, or ask an admin to correct it.',
+    editorsUndoWindow:
+      'You can undo your own entries for 10 minutes. After that, ask an admin to correct them, or tick "Check this entry later" when unsure.',
     noAwardees: "Add awardees on the event page first, or record general donations.",
     blockedRole: "Your role can view donations but not record them.",
+  },
+
+  outbox: {
+    title: "Waiting to send",
+    intro:
+      "Donations saved on this phone that Ovation has not received yet. They are sent by themselves whenever you are online.",
+    empty: "Everything has been sent.",
+    sendNow: "Send now",
+    sending: "Sending…",
+    badge: (n: number) =>
+      n === 1 ? "1 donation waiting to send" : `${n} donations waiting to send`,
+    attention: (n: number) => (n === 1 ? "1 needs attention" : `${n} need attention`),
+    pendingStatus: "Waiting to send",
+    attentionStatus: "Needs attention",
+    sentStatus: "Sent",
+    problemClosed: "The event is closed. Ask an admin to reopen it, then press Try again.",
+    problemForbidden: "Your role can no longer record donations here. Ask an admin.",
+    problemNotFound:
+      "The event or awardee no longer exists. Download a copy and check with an admin.",
+    problemUnknown: "Ovation did not confirm this one. Press Try again.",
+    tryAgain: "Try again",
+    tryAgainAll: "Try all again",
+    tryAgainLabel: (amount: string, donor: string) => `Try again: ${amount} from ${donor}`,
+    delete: "Delete",
+    deleteLabel: (amount: string, donor: string) => `Delete ${amount} from ${donor}`,
+    deleteTitle: "Delete this unsent donation?",
+    deleteBody:
+      "Ovation never received it. Deleting it removes it from this phone for good. Download a copy first if you are unsure.",
+    deleted: "Unsent donation deleted.",
+    download: "Download a copy (CSV)",
+    oldWarning:
+      "Some donations have waited more than a day. Connect to the internet and open Ovation so they can be sent.",
+    otherAccounts: (n: number) =>
+      `${n === 1 ? "1 more donation was" : `${n} more donations were`} saved by another account on this phone. Sign in with that account to send ${n === 1 ? "it" : "them"}.`,
+    savedAt: (when: string) => `Saved ${when}`,
+    lastSent: (when: string) => `Last sent ${when}.`,
+    lastError: (message: string) => `Last try: ${message}`,
+    retryAt: (when: string) => `Trying again at ${when}.`,
+    storageLow: "This phone is nearly out of storage. Send waiting donations soon.",
+    csvFile: "ovation-unsent-donations",
+  },
+
+  sync: {
+    allSent: "All donations sent.",
+    waiting: (n: number) =>
+      n === 1
+        ? "1 saved on this phone, waiting to send."
+        : `${n} saved on this phone, waiting to send.`,
+    sending: (n: number) => (n === 1 ? "Sending 1…" : `Sending ${n}…`),
+    offlineNone:
+      "Offline. Keep recording: donations are saved on this phone and sent when you reconnect.",
+    offlineSome: (n: number) =>
+      n === 1
+        ? "Offline. 1 saved on this phone, waiting to send."
+        : `Offline. ${n} saved on this phone, waiting to send.`,
+    signedOut: "Signed out. Sign in again to send the donations saved on this phone.",
+    seeWaiting: "See what is waiting",
+  },
+
+  signOutGuard: {
+    title: (n: number) =>
+      n === 1 ? "1 donation has not been sent yet" : `${n} donations have not been sent yet`,
+    body: "They stay on this phone and are sent when you sign in again with this account. If someone else will use this phone, download a copy first.",
+    signOutAnyway: "Sign out anyway",
+    cancel: "Cancel",
+  },
+
+  offlineRecord: {
+    title: "Record donations offline",
+    intro: "These events were opened on this phone before, so you can keep recording:",
+    none: "To record offline, open an event's Record donations page once while online.",
+    usingSaved: (when: string) =>
+      `You are offline. Using the awardee list saved on this phone at ${when}. Totals may be out of date.`,
+    pageNeedsConnection: "You are offline, and this page needs a connection.",
   },
 
   donations: {
@@ -328,6 +403,9 @@ export const strings = {
     all: "All donations",
     filterLabel: "Show donations for",
     filterAll: "Everyone",
+    orderLabel: "Order",
+    oldestFirst: "Oldest first",
+    newestFirst: "Newest first",
     show: "Show",
     empty: "No donations recorded yet.",
     emptyFiltered: "No donations for this awardee yet.",

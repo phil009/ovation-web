@@ -30,6 +30,8 @@ import { useAuthActions, useSession } from "@/lib/auth/auth-provider";
 import { strings } from "@/lib/strings";
 import { applyTheme, currentTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { unsentFor } from "@/lib/offline/outbox";
+import { UnsentBar } from "./sync-provider";
 import { OfflineBanner } from "./offline-banner";
 import { SessionExpiryWarning } from "./session-expiry";
 
@@ -154,6 +156,11 @@ function UserMenu() {
         <MenuSeparator />
         <MenuItem
           onSelect={async () => {
+            // Donations still on the phone: warn first (on the settings page).
+            if (user && (await unsentFor(user.id)).length > 0) {
+              router.push("/settings?signout=1");
+              return;
+            }
             await logout();
             toast.show({ message: strings.login.signedOut, tone: "success" });
             router.replace("/login");
@@ -180,6 +187,7 @@ export function AppHeader() {
         <UserMenu />
       </div>
       <OfflineBanner />
+      <UnsentBar />
       <SessionExpiryWarning />
     </header>
   );

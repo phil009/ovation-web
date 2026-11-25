@@ -6,7 +6,6 @@ import {
   donationSchema,
   donationToValues,
   donationUpdateBody,
-  sameDonation,
   type DonationDto,
   type DonationValues,
 } from "./validation";
@@ -115,13 +114,6 @@ describe("donation bodies", () => {
     createdAt: "2026-11-08T10:00:00.000Z",
     updatedAt: "2026-11-08T10:00:00.000Z",
   };
-
-  it("notices when a retry returned an earlier version of the entry", () => {
-    const body = donationCreateBody(values, { id: "id-1", eventId: "e-1" });
-    expect(sameDonation(body, saved)).toBe(true);
-    expect(sameDonation({ ...body, amountKobo: "6000000" }, saved)).toBe(false);
-    expect(sameDonation({ ...body, awardeeId: null }, saved)).toBe(false);
-  });
 
   it("turns a donation back into form values", () => {
     expect(donationToValues({ ...saved, awardeeId: null })).toEqual({

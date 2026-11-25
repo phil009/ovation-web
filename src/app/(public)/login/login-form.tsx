@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ErrorSummary } from "@/components/ui/error-summary";
 import { TextField } from "@/components/ui/field";
 import { Notice } from "@/components/ui/misc";
+import { useLiveQuery } from "@/lib/offline/live";
+import { allUnsentCount } from "@/lib/offline/outbox";
 import { PasswordField } from "@/components/ui/password-field";
 import { useAuthActions, useSession } from "@/lib/auth/auth-provider";
 import { safeNextPath } from "@/lib/auth/redirect";
@@ -56,6 +58,7 @@ export function LoginForm() {
         {endedReason === "expired" ? (
           <Notice tone="warning">{strings.login.sessionExpired}</Notice>
         ) : null}
+        <UnsentNotice />
         <ErrorSummary items={summaryItems(errors, ids, formError)} focusKey={focusKey} />
 
         <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
@@ -97,4 +100,11 @@ export function LoginForm() {
       </div>
     </>
   );
+}
+
+/** Donations from an earlier session still on this phone: they go once the same account signs in. */
+function UnsentNotice() {
+  const count = useLiveQuery(allUnsentCount, "unsent:all");
+  if (!count) return null;
+  return <Notice tone="warning">{strings.login.unsent(count)}</Notice>;
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Download, LogOut, MonitorSmartphone } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { PageHeading } from "@/components/app/shell";
+import { SignOutWarning } from "@/components/app/sign-out-guard";
+import { useUnsent } from "@/components/app/sync-provider";
 import { summaryItems, useSubmitErrors } from "@/components/forms/form-kit";
 import { useInstall } from "@/components/pwa/pwa";
 import { Button } from "@/components/ui/button";
@@ -174,10 +176,24 @@ function Install() {
 
 function Sessions() {
   const { logout, logoutAll } = useAuthActions();
+  const { user } = useSession();
+  const unsent = useUnsent(user?.id);
   const router = useRouter();
+  const search = useSearchParams();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which sign-out waits for the unsent-donations warning. The header menu sends people here
+  // with ?signout=1 when donations are still on the phone.
+  const [confirming, setConfirming] = useState<"logout" | "logoutAll" | null>(() =>
+    search.get("signout") === "1" ? "logout" : null,
+  );
+
+  /** Signs out, unless donations are unsent: then the warning comes first. */
+  function request(kind: "logout" | "logoutAll") {
+    if (unsent && unsent.length > 0) setConfirming(kind);
+    else void run(kind === "logout" ? logout : logoutAll);
+  }
 
   async function run(action: () => Promise<void>) {
     setPending(true);
@@ -202,7 +218,7 @@ function Sessions() {
       <Button
         variant="secondary"
         disabled={pending}
-        onClick={() => void run(logout)}
+        onClick={() => request("logout")}
         className="self-start"
       >
         <LogOut aria-hidden />
@@ -221,8 +237,16 @@ function Sessions() {
         confirmLabel={strings.settings.logoutAllConfirm}
         cancelLabel={strings.settings.cancel}
         destructive
-        onConfirm={() => void run(logoutAll)}
+        onConfirm={() => request("logoutAll")}
       />
+      {confirming && unsent && unsent.length > 0 ? (
+        <SignOutWarning
+          entries={unsent}
+          pending={pending}
+          onConfirm={() => void run(confirming === "logout" ? logout : logoutAll)}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
     </Section>
   );
 }

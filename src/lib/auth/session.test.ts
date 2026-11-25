@@ -443,6 +443,34 @@ describe("proactive refresh", () => {
 });
 
 describe("logout", () => {
+  it("is not undone by a refresh that was still in flight", async () => {
+    const store = memoryStore(stored());
+    const late = pair();
+    let answer: (o: RefreshOutcome) => void = () => undefined;
+    const transport = {
+      refresh: vi.fn(() => new Promise<RefreshOutcome>((resolve) => (answer = resolve))),
+      logout: vi.fn(async () => undefined),
+    };
+    const session = new SessionManager({ store, transport });
+    // A page load: restore signs in from storage and starts a refresh in the background.
+    void session.restore();
+    await vi.advanceTimersByTimeAsync(0);
+    const refreshing = session.refresh().catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transport.refresh).toHaveBeenCalledTimes(1);
+
+    // The user signs out before the refresh answers; then the answer arrives.
+    await session.logout();
+    answer({ kind: "ok", tokens: late });
+    expect(await refreshing).toBeInstanceOf(SessionEndedError);
+
+    expect(session.getSnapshot().status).toBe("anonymous");
+    expect(store.peek()).toBeUndefined();
+    expect(session.getAccessToken()).toBeNull();
+    // The token from the late answer is revoked too.
+    expect(transport.logout).toHaveBeenCalledWith(late.refreshToken);
+  });
+
   it("calls the server, clears local state, and ignores network failures", async () => {
     const store = memoryStore(stored());
     const transport = {

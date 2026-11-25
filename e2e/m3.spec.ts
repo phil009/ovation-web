@@ -98,7 +98,7 @@ test("admin records, undoes, lists, edits and deletes donations", async ({ page,
   await expect(page.getByRole("heading", { level: 1, name: "Record donations" })).toBeVisible();
   const bar = page.locator("p", { hasText: "Total so far" });
   await expect(forField(page)).toHaveValue(/.+/);
-  await expect(page.getByText("Online. Each donation is saved")).toBeVisible();
+  await expect(page.getByText("All donations sent.")).toBeVisible();
   await checkAxeBothThemes(page);
 
   // Nothing typed: the error summary lists both required fields.
@@ -131,7 +131,10 @@ test("admin records, undoes, lists, edits and deletes donations", async ({ page,
   await expect(page.getByText("Saved ₦25,000 from Mr Chidi Eze.")).toBeVisible();
   await expect(bar).toContainText("125,000 naira");
   await expect(page.getByRole("radio", { name: "Cash" })).toBeChecked();
-  await page.getByRole("button", { name: "Undo ₦25,000 from Mr Chidi Eze" }).click();
+  await page
+    .getByRole("region", { name: "Notifications" })
+    .getByRole("button", { name: "Undo ₦25,000 from Mr Chidi Eze" })
+    .click();
   await expect(page.getByText("Removed ₦25,000 from Mr Chidi Eze.")).toBeVisible();
   await expect(bar).toContainText("100,000 naira");
 
@@ -170,6 +173,15 @@ test("admin records, undoes, lists, edits and deletes donations", async ({ page,
   const results = page.getByRole("heading", { level: 2, name: /Donations for 2\. Lolo Ada/ });
   await expect(results).toBeFocused();
   await expect(results).toContainText("1 donation");
+  // General donations on their own (the API's general=true).
+  await page.getByLabel("Show donations for").selectOption({ label: "General (for all awardees)" });
+  await page.getByRole("button", { name: "Show" }).click();
+  const general = page.getByRole("heading", { level: 2, name: /Donations for General/ });
+  await expect(general).toBeFocused();
+  await expect(general).toContainText("1 donation");
+  await page.getByLabel("Show donations for").selectOption({ label: "2. Lolo Ada" });
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(results).toBeFocused();
 
   // Someone else edits the donation first: our save gets a 409 and offers the latest version.
   const list = (await (
@@ -215,7 +227,7 @@ test("admin records, undoes, lists, edits and deletes donations", async ({ page,
   await expect(table.getByText("150,000 naira").first()).toBeAttached();
   await expect(table.getByRole("link", { name: "Lolo Ada", exact: true })).toBeVisible();
 
-  // An editor records but cannot undo or edit.
+  // An editor records and can undo their own entry, but cannot edit.
   await page.goto("/settings");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -224,12 +236,32 @@ test("admin records, undoes, lists, edits and deletes donations", async ({ page,
   await donorField(page).fill("Mrs Ngozi Okafor");
   await amountField(page).fill("2000");
   await page.getByRole("button", { name: "Save donation" }).click();
+  // Names used earlier at the event are suggested (GET /events/{id}/donor-names).
+  await expect(page.locator("datalist option[value='Mrs Ngozi Okafor']")).toBeAttached();
   await expect(page.getByText("Saved ₦2,000 from Mrs Ngozi Okafor.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Undo/ })).toHaveCount(0);
-  await expect(page.getByText(/ask an admin to correct it/)).toBeVisible();
+  await expect(page.getByText(/undo your own entries for 10 minutes/)).toBeVisible();
+  // Undo from the "saved just now" list (the toast may already be gone).
+  await page
+    .getByRole("region", { name: "Saved on this phone just now" })
+    .getByRole("button", { name: "Undo ₦2,000 from Mrs Ngozi Okafor" })
+    .click();
+  await expect(page.getByText("Removed ₦2,000 from Mrs Ngozi Okafor.")).toBeVisible();
+  await donorField(page).fill("Mr Kept");
+  await amountField(page).fill("3000");
+  await page.getByRole("button", { name: "Save donation" }).click();
+  await expect(page.getByText("Saved ₦3,000 from Mr Kept.")).toBeVisible();
   await page.getByRole("link", { name: "All donations" }).click();
   await expect(page.getByRole("heading", { level: 2, name: /All donations/ })).toContainText(
     "2 donations",
   );
+  // Newest first puts the editor's entry at the top.
+  await page.getByLabel("Order").selectOption({ label: "Newest first" });
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: /All donations/ })
+      .getByRole("listitem")
+      .first(),
+  ).toContainText("Mr Kept");
   await expect(page.getByRole("link", { name: /^Edit donation/ })).toHaveCount(0);
 });

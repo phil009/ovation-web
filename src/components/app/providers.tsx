@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { isApiError } from "@/lib/api/errors";
 import { EventNotInOrgError } from "@/lib/api/queries";
@@ -12,6 +12,10 @@ import { HealthProvider } from "./cold-start";
 import { RouteFocus } from "./route-focus";
 
 function makeQueryClient() {
+  // TanStack assumes "online" until an offline event fires, which never happens when the app
+  // starts with no connection. Start from the browser's answer so queries pause instead of
+  // failing and retrying in a loop.
+  if (typeof navigator !== "undefined") onlineManager.setOnline(navigator.onLine);
   return new QueryClient({
     defaultOptions: {
       queries: {

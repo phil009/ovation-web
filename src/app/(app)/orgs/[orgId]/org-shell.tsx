@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { LinkButton, Main, PageHeading } from "@/components/app/shell";
+import { OfflineRecordLinks } from "@/components/app/offline-record-links";
 import { PageSkeleton } from "@/components/app/route-guard";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/misc";
 import { api, call } from "@/lib/api/client";
 import { isApiError } from "@/lib/api/errors";
+import { isUnreachable } from "@/lib/api/queries";
 import { ACTIVE_ORG_PREF, roleAtLeast, useRole, type Role } from "@/lib/auth/auth-provider";
 import { setPref } from "@/lib/db";
 import { strings } from "@/lib/strings";
@@ -46,6 +48,27 @@ export function OrgShell({ children }: { children: ReactNode }) {
     });
     if (org.data) void setPref(ACTIVE_ORG_PREF, orgId).catch(() => undefined);
   }, [orgId, org.data, queryClient]);
+
+  // No connection: the entry screen works from what this phone saved; other pages need the
+  // network, so they say so and point to what does work offline.
+  if (isUnreachable(org)) {
+    if (pathname.endsWith("/record")) return <>{children}</>;
+    return (
+      <Main>
+        <PageHeading>{strings.offline.title}</PageHeading>
+        <Notice tone="warning">
+          <p>{strings.offlineRecord.pageNeedsConnection}</p>
+        </Notice>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button onClick={() => void org.refetch()}>{strings.coldStart.retry}</Button>
+          <LinkButton variant="secondary" href="/outbox">
+            {strings.outbox.title}
+          </LinkButton>
+        </div>
+        <OfflineRecordLinks orgId={orgId} />
+      </Main>
+    );
+  }
 
   if (org.isPending) return <PageSkeleton />;
 

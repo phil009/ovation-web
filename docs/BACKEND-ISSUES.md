@@ -4,66 +4,7 @@ Issues the frontend found in the backend (`../backend`). They don't block curren
 
 ## Open
 
-### 1. A password change on one device can sign out every device (bug)
-
-`auth.service.ts`, `refresh()`: the theft check compares the time since `revokedAt` with `REUSE_GRACE_MS`. A password change and logout-all also set `revokedAt` (`changePassword`, `revokeAll`), not only rotation.
-
-**What goes wrong:**
-
-1. The user changes their password on phone A, which revokes phone B's token and issues a new session for A.
-2. More than 2 minutes later, phone B opens the app and refreshes with its revoked token.
-3. The backend treats that as theft and calls `revokeAll`. The new session on phone A ends too.
-
-**Fix:** treat reuse as theft only for tokens revoked by rotation (`replacedById` is set). Any other revoked token gets a plain 401. Add a smoke test: change the password, wait (or back-date), refresh with the old token from another device, and check the new session still works.
-
-The bug predates the replay change; the earlier version had the same check with 30 seconds.
-
-### 2. The SDK version didn't change with the contract
-
-The contract changed (`ErrorResponseDto`, the `awardeeId` type, the 401 responses), but the SDK is still `0.2.0`. Bump the version on every contract change, so `pnpm sdk:pull` shows that something changed.
-
-### 3. Length limits are missing from the OpenAPI document
-
-class-validator enforces them, but `@ApiProperty` doesn't declare them, so the generated SDK can't carry them. The frontend copies them into `src/lib/validation.ts` by hand.
-
-| Field                   | Backend rule | DTO                      |
-| ----------------------- | ------------ | ------------------------ |
-| Account `name`          | 1 to 100     | `login.dto.ts`           |
-| Organisation `name`     | 2 to 120     | `orgs.dto.ts`            |
-| Awardee `name`          | 1 to 200     | `create-awardee.dto.ts`  |
-| Donation `donorName`    | 1 to 200     | `create-donation.dto.ts` |
-| Donation `note`         | up to 500    | `create-donation.dto.ts` |
-| Invite `code` (preview) | up to 40     | `orgs.dto.ts`            |
-
-**Fix:** add `minLength` and `maxLength` to each `@ApiProperty`.
-
-### 4. `CreateEventDto.name` has no maximum length
-
-`events/dto`: `@MinLength(2)` only. A very long name is stored and breaks layouts and the Excel export. The frontend caps it at 200 for now.
-
-**Fix:** add `@MaxLength(200)` (or 120, to match organisation names) and declare it in `@ApiProperty`.
-
-### 5. Audit `before` and `after` are typed `Record<string, never>`
-
-`AuditEntryDto.before` and `after` are generated as `Record<string, never> | null`, which says "an object with no fields". The frontend reads them as `unknown` (`src/lib/audit.ts`).
-
-**Fix:** declare them as `{ type: 'object', additionalProperties: true, nullable: true }` so they generate as `Record<string, unknown> | null`.
-
-### 6. Editors can't undo or correct their own donations
-
-`donations.controller.ts`: `PATCH` and `DELETE /donations/{id}` need `ADMIN`. Editors do most of the typing at an event, so the 10-second Undo after a save only works for admins. An editor who mistypes has to find an admin.
-
-**Frontend now:** Undo shows for admins only. Editors see a note saying to tick "Check this entry later" or ask an admin.
-
-**Fix (suggested):** let the creator delete (and perhaps edit) their own donation within a short window, for example 10 minutes after `createdAt`, while the event is open. Admins keep full rights. Record it in the audit log as usual.
-
-### 7. The donations list can't filter general donations, and only sorts oldest first
-
-`list-donations.query.ts`: `awardeeId` filters by one awardee, but there is no way to ask for general donations only (`awardeeId` null). The list is always oldest first, and there is no donor-name search.
-
-**Frontend now:** general donations only appear in the "Everyone" list, labelled General. Donor-name suggestions read the first 500 donations of the event (one page of the largest size), so names after that are not suggested.
-
-**Fix (suggested):** accept `awardeeId=general` (or a `general=true` flag), an `order=desc` option, and a `q` donor-name search. A small `GET /events/{id}/donor-names` (distinct names) would make autocomplete exact and cheap.
+None.
 
 ## Done
 
@@ -72,3 +13,13 @@ class-validator enforces them, but `@ApiProperty` doesn't declare them, so the g
 - `CreateDonationDto.awardeeId` is documented as a nullable uuid string.
 - `ErrorResponseDto` is the default response on every endpoint, with the 401s on login, refresh and password change.
 - The README's SDK example keeps the token in memory.
+
+Fixed in backend 0.3.0 (deployed 2026-11-25), with smoke checks in `scripts/smoke.mjs`:
+
+- A token ended by logout, logout-all or a password change gets a plain 401 on reuse; only tokens spent by a refresh count as theft. A password change on one phone no longer signs out the new session.
+- The API version comes from `package.json` (now 0.3.0); bump it on every contract change.
+- Length limits are declared in the OpenAPI document (names, email, invite code, donor name, note).
+- Event names are capped at 200 characters.
+- Audit `before` and `after` are typed `Record<string, unknown> | null`.
+- Editors can delete (undo) a donation they created themselves, within 10 minutes. Admins can delete any.
+- `GET /donations` takes `general=true`, `order=desc` and `q` (donor name search); `GET /events/{id}/donor-names` returns every distinct donor name.

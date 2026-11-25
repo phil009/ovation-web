@@ -156,6 +156,11 @@ export class SessionManager {
   private inflight: Promise<string> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private retryIndex = 0;
+  /**
+   * Bumped whenever the session ends. A refresh that started before the bump must not bring
+   * the session back when its answer arrives (sign-out while a refresh is in flight).
+   */
+  private epoch = 0;
   private readonly cleanups: (() => void)[] = [];
   private readonly lock: LockRunner;
   private readonly now: () => number;
@@ -265,11 +270,22 @@ export class SessionManager {
     const firstSend = stored.refreshSentAt === undefined;
     if (firstSend) await this.deps.store.put({ ...stored, refreshSentAt: this.now() });
 
+    const epoch = this.epoch;
     let outcome: RefreshOutcome;
     try {
       outcome = await this.deps.transport.refresh(stored.refreshToken);
     } catch {
       outcome = { kind: "unavailable" };
+    }
+
+    if (this.epoch !== epoch) {
+      // Signed out while this refresh was on its way. Don't store its tokens; end the new
+      // session on the server too (best effort; logging out with the old token already
+      // revokes an unseen replacement).
+      if (outcome.kind === "ok") {
+        await this.deps.transport.logout(outcome.tokens.refreshToken).catch(() => undefined);
+      }
+      throw new SessionEndedError();
     }
 
     if (outcome.kind === "ok") {
@@ -325,6 +341,7 @@ export class SessionManager {
 
   /** Clears local session state without calling the server (used after logout-all). */
   async endLocally(reason: "expired" | "logout", broadcast: boolean): Promise<void> {
+    this.epoch += 1;
     this.clearTimer();
     this.accessToken = null;
     this.accessExpiresAt = 0;

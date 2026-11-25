@@ -69,7 +69,7 @@ export type JoinValues = z.infer<typeof joinSchema>;
 // ---- events ------------------------------------------------------------------------------
 
 export const eventSchema = z.object({
-  // The backend requires 2 characters and sets no maximum yet (docs/BACKEND-ISSUES.md).
+  // 2 to 200 characters, as in the OpenAPI document (CreateEventDto.name).
   name: z
     .string()
     .trim()
@@ -184,7 +184,7 @@ export const GENERAL = "";
 /** Form values stay strings; `donationCreateBody` and `donationUpdateBody` build the API body. */
 export const donationSchema = z.object({
   awardeeId: z.string(),
-  // The backend allows 1 to 200 characters (create-donation.dto.ts).
+  // 1 to 200 characters, as in the OpenAPI document (CreateDonationDto.donorName).
   donorName: z.string().trim().min(1, v.donorNameRequired).max(200, v.donorNameTooLong),
   amount: z.string().superRefine((value, ctx) => {
     const parsed = parseNairaInput(value);
@@ -239,19 +239,6 @@ export function donationUpdateBody(values: DonationValues, version: number): Upd
     needsReview: values.needsReview,
     note: values.note.trim(),
   };
-}
-
-/**
- * Did the server keep what we sent? Creating is idempotent on the client id, so a retry
- * after a lost response, with the form changed in between, returns the first version.
- */
-export function sameDonation(sent: CreateDonationBody, saved: DonationDto): boolean {
-  return (
-    (sent.awardeeId ?? null) === saved.awardeeId &&
-    sent.donorName === saved.donorName &&
-    sent.amountKobo === saved.amountKobo &&
-    sent.paymentMode === saved.paymentMode
-  );
 }
 
 /** The form values for an existing donation (edit page). */

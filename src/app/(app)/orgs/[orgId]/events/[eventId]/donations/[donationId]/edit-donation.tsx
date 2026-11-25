@@ -199,7 +199,12 @@ function EditForm({
         </Button>
       ) : null}
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
-        <DonationFields form={form} ids={ids} options={awardeeOptions(summary)} withStatus />
+        <DonationFields
+          form={form}
+          ids={ids}
+          options={awardeeOptions(summary.awardees)}
+          withStatus
+        />
         <DonationExtras form={form} ids={ids} />
         <Button type="submit" size="wide" disabled={isSubmitting || coolingDown || stale}>
           {isSubmitting ? strings.donations.saving : strings.donations.save}

@@ -13,6 +13,7 @@ import { SelectField } from "@/components/ui/choice";
 import { Card, Money, Notice, StatusBadge } from "@/components/ui/misc";
 import {
   DONATIONS_PAGE_SIZE,
+  GENERAL_FILTER,
   donationsQuery,
   eventQuery,
   isNotFound,
@@ -28,8 +29,9 @@ import { useOrgRole } from "../../../org-shell";
 const ALL = "all";
 
 /**
- * Every donation at an event, in the order they were recorded, 100 a page. Filter by
- * awardee through the URL (?awardee=…&page=…), so Back and shared links work.
+ * Every donation at an event, 100 a page, oldest or newest first. Filter by awardee (or
+ * general donations) through the URL (?awardee=…&order=desc&page=…), so Back and shared
+ * links work.
  */
 export function DonationsView() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -37,8 +39,9 @@ export function DonationsView() {
   const search = useSearchParams();
   const router = useRouter();
   const awardeeId = search.get("awardee") ?? undefined;
+  const order = search.get("order") === "desc" ? "desc" : "asc";
   const page = Math.max(0, Number.parseInt(search.get("page") ?? "0", 10) || 0);
-  const filters = { awardeeId, offset: page * DONATIONS_PAGE_SIZE };
+  const filters = { awardeeId, order, offset: page * DONATIONS_PAGE_SIZE } as const;
 
   const event = useQuery(eventQuery(orgId, eventId));
   const summary = useQuery(summaryQuery(orgId, eventId));
@@ -55,7 +58,7 @@ export function DonationsView() {
   const [navigated, setNavigated] = useState(false);
   useEffect(() => {
     if (navigated && !donations.isPlaceholderData) resultsRef.current?.focus();
-  }, [navigated, donations.isPlaceholderData, awardeeId, page]);
+  }, [navigated, donations.isPlaceholderData, awardeeId, order, page]);
 
   if (event.isPending || summary.isPending) return <PageSkeleton />;
   const error = event.error ?? summary.error;
@@ -88,11 +91,15 @@ export function DonationsView() {
   const filterOptions = [
     { value: ALL, label: strings.donations.filterAll },
     ...summary.data.awardees.map((a) => ({ value: a.id, label: awardeeLabel.get(a.id) ?? a.name })),
+    { value: GENERAL_FILTER, label: strings.record.general },
   ];
+  const filterLabel = (id: string) =>
+    id === GENERAL_FILTER ? strings.record.general : (awardeeLabel.get(id) ?? "");
 
-  const go = (next: { awardee?: string; page?: number }) => {
+  const go = (next: { awardee?: string; order?: "asc" | "desc"; page?: number }) => {
     const params = new URLSearchParams();
     if (next.awardee) params.set("awardee", next.awardee);
+    if (next.order === "desc") params.set("order", "desc");
     if (next.page) params.set("page", String(next.page));
     const query = params.toString();
     setNavigated(true);
@@ -101,8 +108,12 @@ export function DonationsView() {
 
   const onFilter = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const value = new FormData(e.currentTarget).get("awardee");
-    go({ awardee: typeof value === "string" && value !== ALL ? value : undefined });
+    const data = new FormData(e.currentTarget);
+    const value = data.get("awardee");
+    go({
+      awardee: typeof value === "string" && value !== ALL ? value : undefined,
+      order: data.get("order") === "desc" ? "desc" : "asc",
+    });
   };
 
   return (
@@ -128,6 +139,17 @@ export function DonationsView() {
           defaultValue={awardeeId ?? ALL}
           className="min-w-64"
         />
+        <SelectField
+          key={order}
+          id="donations-order"
+          name="order"
+          label={strings.donations.orderLabel}
+          options={[
+            { value: "asc", label: strings.donations.oldestFirst },
+            { value: "desc", label: strings.donations.newestFirst },
+          ]}
+          defaultValue={order}
+        />
         <Button type="submit" variant="secondary">
           {strings.donations.show}
         </Button>
@@ -151,7 +173,7 @@ export function DonationsView() {
               className="text-2xl font-semibold outline-none"
             >
               {awardeeId
-                ? strings.donations.viewFor(awardeeLabel.get(awardeeId) ?? "")
+                ? strings.donations.viewFor(filterLabel(awardeeId))
                 : strings.donations.all}
               <span className="block text-base font-normal text-muted">
                 {donations.data.total === 0
@@ -192,14 +214,14 @@ export function DonationsView() {
                 <Button
                   variant="secondary"
                   disabled={page === 0}
-                  onClick={() => go({ awardee: awardeeId, page: page - 1 })}
+                  onClick={() => go({ awardee: awardeeId, order, page: page - 1 })}
                 >
                   {strings.donations.previous}
                 </Button>
                 <Button
                   variant="secondary"
                   disabled={filters.offset + donations.data.items.length >= donations.data.total}
-                  onClick={() => go({ awardee: awardeeId, page: page + 1 })}
+                  onClick={() => go({ awardee: awardeeId, order, page: page + 1 })}
                 >
                   {strings.donations.next}
                 </Button>

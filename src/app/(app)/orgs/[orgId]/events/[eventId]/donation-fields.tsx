@@ -4,7 +4,6 @@ import { useWatch, type UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { RadioFieldset, SelectField } from "@/components/ui/choice";
 import { TextField } from "@/components/ui/field";
-import type { EventSummary } from "@/lib/api/queries";
 import { formatNaira, parseNairaInput } from "@/lib/money";
 import { WORDS_FROM_KOBO, nairaInWords } from "@/lib/naira-words";
 import { strings } from "@/lib/strings";
@@ -41,9 +40,11 @@ export function donationFieldIds(prefix: string): DonationFieldIds {
 }
 
 /** "1. Chief Emeka Obi", in the summary's order, then General. */
-export function awardeeOptions(summary: EventSummary) {
+export function awardeeOptions(
+  awardees: readonly { id: string; number: number | null; name: string }[],
+) {
   return [
-    ...summary.awardees.map((a) => ({
+    ...awardees.map((a) => ({
       value: a.id,
       label: strings.record.awardeeOption(a.number, a.name),
     })),

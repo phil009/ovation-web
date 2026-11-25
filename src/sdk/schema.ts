@@ -394,10 +394,30 @@ export interface paths {
         get: operations["DonationsController_get"];
         put?: never;
         post?: never;
+        /**
+         * Delete a donation (soft delete)
+         * @description Admins can delete any donation. Editors can delete a donation they created themselves, within 10 minutes of creating it (an Undo). Otherwise 403. The event must be open (409).
+         */
         delete: operations["DonationsController_remove"];
         options?: never;
         head?: never;
         patch: operations["DonationsController_update"];
+        trace?: never;
+    };
+    "/api/events/{eventId}/donor-names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["EventDonationsController_donorNames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/events/{eventId}/summary": {
@@ -611,9 +631,13 @@ export interface components {
             entity: "Organization" | "Membership" | "InviteCode" | "Event" | "Awardee" | "Donation";
             entityId: string;
             /** @description Row before the change (null for creates) */
-            before: Record<string, never> | null;
+            before: {
+                [key: string]: unknown;
+            } | null;
             /** @description Row after the change */
-            after: Record<string, never> | null;
+            after: {
+                [key: string]: unknown;
+            } | null;
             /** Format: date-time */
             createdAt: string;
             user: components["schemas"]["AuditUserDto"];
@@ -779,6 +803,10 @@ export interface components {
             note?: string;
             /** @description The version you last read. A stale version is rejected with 409. */
             version: number;
+        };
+        DonorNamesDto: {
+            /** @description Distinct donor names, sorted */
+            names: string[];
         };
         SummaryEventDto: {
             /** Format: uuid */
@@ -1909,7 +1937,14 @@ export interface operations {
         parameters: {
             query: {
                 eventId: string;
+                /** @description Only donations for this awardee. Not together with general. */
                 awardeeId?: string;
+                /** @description true: only general donations (no awardee). Not together with awardeeId. */
+                general?: boolean;
+                /** @description Donor name contains this (any case) */
+                q?: string;
+                /** @description By time recorded */
+                order?: "asc" | "desc";
                 limit?: number;
                 offset?: number;
             };
@@ -2089,6 +2124,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    EventDonationsController_donorNames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DonorNamesDto"];
+                };
             };
             /** @description Error */
             default: {

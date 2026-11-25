@@ -17,6 +17,7 @@ Target: **WCAG 2.2 AA**, enforced by tooling where possible. Users are often old
 - One polite live region (`useAnnounce()`), debounced.
 - Toasts with an action stay at least 10 seconds and pause on hover and focus. When several are up, each action has its own name ("Undo ₦25,000 from Mr Chidi Eze"), starting with the visible word.
 - Every page has bottom space, so the last item can always scroll clear of a toast.
+- **Sync status** is text with an icon, never colour alone. It is not a live region (the offline banner and the save toasts already speak), so screen readers aren't interrupted while typing. The sign-out warning moves focus to its heading.
 - **The entry screen:** a sticky bar shows who is being recorded for and their total; focused fields scroll clear of it. The amount is read back as a figure and, from 100,000 naira, in words. After each save, focus returns to the donor's name and the new total is announced once (debounced). Quick amounts show the full figure ("₦10,000"), so the visible text is the button's name.
 - Wide tables (totals, audit log) scroll inside a focusable, labelled region; the page itself never scrolls sideways.
 - Pledged and Received always show an icon plus the word. Money shows tabular digits and reads aloud as "50,000 naira".
@@ -34,6 +35,7 @@ Target: **WCAG 2.2 AA**, enforced by tooling where possible. Users are often old
 | axe on `/orgs`, `/orgs/new`, `/orgs/[id]`, `/settings` and the join preview, light and dark                                                                                    | `e2e/flows.spec.ts` (needs `E2E_API_URL`)    |
 | axe and no sideways page scroll on events, new event, the event page (open and closed), edit awardee, members, invite codes and audit log, light and dark, as admin and viewer | `e2e/m2.spec.ts` (needs `E2E_API_URL`)       |
 | axe and no sideways page scroll on the entry screen, the donations list and edit donation, light and dark                                                                      | `e2e/m3.spec.ts` (needs `E2E_API_URL`)       |
+| axe and no sideways page scroll on the entry screen offline, Waiting to send, and the sign-out warning, light and dark                                                         | `e2e/m4.spec.ts` (needs `E2E_API_URL`)       |
 | Register, sign out, sign in and join with a code, keyboard only                                                                                                                | `e2e/keyboard.spec.ts` (needs `E2E_API_URL`) |
 
 ## Manual checklist (for Philip)
@@ -45,8 +47,9 @@ Tools can't run these. Tick each one once it's done on a real device.
 - [ ] **200 percent zoom** (and 320 CSS px width) on every page: nothing is cut off and there is no horizontal scroll.
 - [ ] **Keyboard only** on desktop: every page, the account menu, the organisation switcher, every confirmation dialog (focus is trapped inside and returns to its trigger), and scrolling the totals table with the arrow keys.
 - [ ] **Screen reader on the event page:** the totals table reads awardee names as row headers and amounts as "… naira"; adding an awardee announces "… added." and returns to the name field; the parsed amount ("= ₦3,000,000") is read while typing.
-- [ ] **Screen reader on the entry screen:** the amount and its words are read while typing; "Saved … from …" then the new total are read after saving; focus is back on the donor's name; the donor suggestions (datalist) can be reached and picked; Undo can be reached before the toast goes.
+- [ ] **Screen reader on the entry screen:** the amount and its words are read while typing; "Saved … from …" then the new total are read after saving; focus is back on the donor's name; the donor suggestions (datalist) can be reached and picked; Undo can be reached in the toast, and later on each entry under "Saved on this phone just now".
 - [ ] **The entry screen on a phone with the keyboard open:** the sticky bar does not hide the field being typed in.
+- [ ] **Offline on a real phone (airplane mode):** record three donations and hear "Saved … from …" each time; the sticky bar says how many are waiting; turn the network on, and the bar changes to "All donations sent" without touching anything. Open the app from the home screen in airplane mode and record again.
 - [ ] **Windows High Contrast** (forced colours): focus rings, borders and badges stay visible. Check the header logo on a dark high-contrast theme.
 - [ ] **Text spacing override** (WCAG 1.4.12 bookmarklet): no clipped text.
 - [ ] **Android system font size at its largest:** forms stay usable.

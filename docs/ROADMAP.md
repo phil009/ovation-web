@@ -1,6 +1,6 @@
 # Roadmap
 
-M0 (foundation), M1 (auth and organisations), M2 (events, awardees, totals and admin screens) and M3 (donations) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
+M0 (foundation), M1 (auth and organisations), M2 (events, awardees, totals and admin screens) and M3 (donations) and M4 (offline recording and sync) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
 
 ## M2: Events, awardees, summary, then admin screens (built)
 
@@ -35,47 +35,37 @@ What was built, and where it differs from the plan:
   - Cash / Transfer / Pledge, defaulting to Transfer, kept between entries.
   - "Note or check later" (folded): the `needsReview` flag and a note of up to 500 characters.
   - Save with Enter or the large button. The form clears, keeps the awardee and payment mode, and focus returns to the donor's name.
-  - Undo for 10 seconds, **admins only** (the backend lets only admins delete; see BACKEND-ISSUES.md, item 6). "Saved on this phone just now" lists the last 10 entries for a quick check.
+  - Undo in the toast for 10 seconds, and on each entry in "Saved on this phone just now" (the last 10). Editors can undo their own entries for 10 minutes; admins any time.
   - Client ids and drafts: DECISIONS.md, items 16 and 17.
-- **The donations list** (`…/donations`, every role): oldest first, 100 a page, filtered by awardee through `?awardee=`. Each entry shows who it's for, the mode, Pledged or Received, the "Check later" flag and the note. Awardee names in the totals table link to their donations.
+- **The donations list** (`…/donations`, every role): 100 a page, oldest or newest first (`?order=desc`), filtered by awardee or General (`?awardee=general`). Each entry shows who it's for, the mode, Pledged or Received, the "Check later" flag and the note. Awardee names in the totals table link to their donations.
 - **Edit donation** (`…/donations/{id}`, admins, open events): every field, plus "Has this pledge been paid?" for pledges. Sends `version`; a 409 offers "Load the latest version". Delete is on the same page.
-- **Not built:** a list of general donations on their own (the API can't filter them; BACKEND-ISSUES.md, item 7). The pledge follow-up view stays in M5.
+- **Not built:** the pledge follow-up view (M5), and a donor-name search box (the API supports `q`; add it if lists get long).
 - **Tests:** `src/lib/m3-helpers.test.ts` (amounts in words, bodies, retries) and `e2e/m3.spec.ts` (admin and editor, axe and no sideways scroll on every new page).
 
-## M4: Offline outbox and sync
+## M4: Offline outbox and sync (built)
 
-Folder design (not built yet):
+What was built, and where it differs from the plan:
 
-```
-src/lib/offline/
-  db.ts          Dexie tables: outbox (donation + eventId + status + attempts + lastError),
-                 donorNames (per event, for autocomplete). `drafts` exists since M3 (src/lib/db.ts)
-  outbox.ts      enqueue(donation) -> writes IndexedDB first, then tries to send
-  sync.ts        drains the outbox in batches of up to 500 to POST /donations/batch;
-                 marks `created` and `duplicates` as done (idempotent on client ids);
-                 single-flight via navigator.locks('ovation-sync')
-  triggers.ts    sync on: app open, focus/visibilitychange, `online`, a visible
-                 "Sync now" button, and after each enqueue. No reliance on Background
-                 Sync (iOS has none)
-  storage.ts     navigator.storage.persist() on first entry; estimate() warning
-  status.ts      useSyncStatus(): pending count, last success, last error
-```
-
-Rules:
-
-- Entering a donation offline must not need a valid access token. Sync waits for `ensureAccessToken()`.
-- **Never wipe the outbox because a session expired.** Logout with unsynced entries is blocked behind a warning that offers an export (CSV or JSON of the pending entries).
-- **Session end with unsynced entries:** when a 401 or the expired replay window (DECISIONS.md, item 4) ends the session, keep the capture screen working offline. Show "Sign in again to sync" instead of sending the user to the login page, and only drain the outbox for the same user id after they sign in again.
-- Donor names: the backend accepts 1 to 200 characters (`create-donation.dto.ts`). Awardee names are 1 to 200 as well, and notes up to 500. These limits are not in the OpenAPI document yet, so mirror them in `validation.ts`.
-- A 4xx for one entry (for example a closed event) marks that entry "needs attention". It is never dropped silently.
-- Ask for persistent storage, and warn when unsynced entries are older than a day.
-- Precache the app shell HTML for offline starts. Every page is a client shell with no data in its HTML, so caching it is safe. Never cache `/api/*`.
-- The refresh-token warning: the `SessionManager.refreshTokenExpiresAt()` banner shows when offline for close to 7 days.
+- **Saving is local first.** "Save donation" writes the donation to the outbox in IndexedDB (`src/lib/offline/outbox.ts`) and returns at once, online or not. Each entry gets its client id at that moment, so every send is safe to repeat.
+- **The sync engine** (`src/lib/offline/sync.ts`, unit-tested with fakes):
+  - one run at a time across tabs (`navigator.locks`, lock `ovation-sync`);
+  - oldest first, up to 500 per `POST /donations/batch`, one event per request; created and duplicate ids are both done;
+  - connection trouble, 5xx and 429 keep everything and retry after 10 s, 30 s, then 1, 2 and 5 minutes;
+  - a closed event, lost access or a removed awardee marks entries "needs attention" (a 400 splits the batch to find the bad entry). Nothing is dropped silently;
+  - triggers: app start, focus, `visibilitychange`, `online`, after every save, "Send now", and its retry timer. No Background Sync (iOS has none).
+- **Status everywhere:** the entry screen's sticky bar says what is on the phone and what is sent, with "Send now"; the running total shows "plus ₦… not sent yet"; a bar under the header on every page links to **Waiting to send** (`/outbox`): every unsent entry by event, Try again, Delete (refused entries only) and a CSV copy. Entries older than a day get a warning.
+- **Undo** works offline: an unsent entry is just removed from the phone. Undo runs inside the sync lock, so it can't race a send.
+- **Offline start:** the entry screen saves an _entry kit_ per event (name, closed, your role, awardees with last known totals) whenever it loads online, and the service worker caches the entry screen's HTML (network first, 6-second timeout). Opened with no signal, the screen works from the kit and says how old it is. `/offline` and the organisation pages list the events that work offline.
+- **Sign-out** with unsent donations shows a warning with a CSV copy. Entries are kept either way and sent when the same account signs in again; the login page says how many are waiting.
+- **Session end with unsent donations:** the user is sent to sign in (a session can only end while online). Entries are kept and sent after sign-in. This replaces the plan's "keep capturing while signed out" (DECISIONS.md, item 20).
+- **Persistent storage** is requested on the first save. `storageNearlyFull()` exists, but no warning is shown yet (M5).
+- **Tests:** `src/lib/offline/*.test.ts`, and `e2e/m4.spec.ts` (offline recording, undo, automatic send, a closed event, the CSV copy, the sign-out warning; with `E2E_SW=1` on a production build, a full offline start through the service worker).
 
 ## M5: Export, pledges, polish
 
 - An "Export to Excel" button: `GET /events/{id}/export.xlsx` with `parseAs: 'blob'`, downloaded with a sanitised file name (event name, letters, digits and dashes).
 - A pledge follow-up view: pledged donations by awardee, a "Mark received" action for admins (PATCH with `version`). The edit page can already mark a single pledge as paid.
+- Show the storage warning (`storageNearlyFull()`) on the Waiting to send page.
 - Performance:
   - bundle analysis;
   - route-level code splitting;

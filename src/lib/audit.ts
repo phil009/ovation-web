@@ -2,7 +2,7 @@ import { formatNaira } from "./money";
 
 /**
  * Audit entries carry the whole row before and after a change. The OpenAPI document types
- * them as `Record<string, never>` (docs/BACKEND-ISSUES.md), so read them as unknown values.
+ * them as `Record<string, unknown> | null`; still checked here, since a row is any shape.
  */
 
 export interface FieldChange {

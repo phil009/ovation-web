@@ -39,6 +39,7 @@ Refresh tokens are single use. If a spent token is sent again within 2 minutes (
 - With no answer (network error, or the 30 second refresh timeout), the same token is retried after 5, 15 and 30 seconds, but only within 100 seconds of the first send (the backend's 2 minutes, minus margin for the retry's own trip).
 - After that, the token is never sent to `/auth/refresh` again: it may be spent, and sending it could end every session on every device. Instead the app calls `/auth/logout` with it (safe, and it also revokes the replacement we never received) and asks the user to sign in again. One device signing in again is better than every device being signed out.
 - Only a 401 from `/auth/refresh`, or that expired window, ends the session.
+- A refresh that answers after the session ended (the user signed out while it was in flight, which happens easily right after a page load) is discarded, and its new token is revoked. Ending a session bumps a counter that every refresh checks before storing tokens. Without this, signing out a second after opening a page could leave the user signed in.
 
 Trade-off: if the network fails while a refresh is in flight and stays down for about two minutes while the browser still reports online (for example, Wi-Fi with no internet), the user has to sign in again. Refreshes happen about every 14 minutes, so this needs bad timing. In M4, this should become a "sign in again to sync" state that keeps offline capture usable, instead of ending the session (ROADMAP.md).
 
@@ -88,28 +89,55 @@ The totals and audit tables are real `<table>`s, which are too wide for a phone.
 
 ## 15. Donations: per awardee or general, and who can change them
 
-Each awardee has their own donation (on the awardee) and any number of supporter donations (`awardeeId` set). A general donation (`awardeeId: null`) is for the event as a whole. The backend lets editors create donations but only admins edit or delete them, so:
+Each awardee has their own donation (on the awardee) and any number of supporter donations (`awardeeId` set). A general donation (`awardeeId: null`) is for the event as a whole. Editors and admins create donations. Only admins edit them. Admins can delete any donation; editors can delete their own within 10 minutes of creating it (backend 0.3.0). So:
 
 - the entry screen is for editors and admins;
-- the 10-second Undo after a save shows for admins only. Editors can flag an entry with "Check this entry later" instead, and see a note to ask an admin. A backend change is suggested in BACKEND-ISSUES.md (item 6);
+- Undo is in the toast (10 seconds) and on each entry under "Saved on this phone just now". For editors it shows for 10 minutes after the entry was created; the server enforces the window, and a late attempt says to ask an admin. "Check this entry later" stays for doubtful entries;
 - the donations list is for every role; Edit (and Delete, on the edit page) is for admins.
 
 ## 16. A donation's client id lives as long as the entry, and a changed retry is caught
 
-The entry form makes a `crypto.randomUUID()` when it opens and keeps it, in the IndexedDB draft too, until the server confirms the save. A retry, even after a reload, is the same donation, and the backend's idempotent create can't save it twice.
+(M3. Since M4 the id is made when an entry is saved to the outbox and never changes, so a changed retry can't happen and the comparison below is gone.) The entry form made a `crypto.randomUUID()` when it opened and keeps it, in the IndexedDB draft too, until the server confirms the save. A retry, even after a reload, is the same donation, and the backend's idempotent create can't save it twice.
 
 The catch: if the response was lost and the user changed the form before retrying, the backend returns the first version unchanged. So after every save the app compares what it sent with what came back (`sameDonation`). If they differ, it says the earlier version was saved, keeps the new values, and gives them a new id, so saving again adds them as a separate donation. Nothing is silently dropped or doubled.
 
 Drafts (`drafts` table, one per event) are restored only for the same user, and cleared on a deliberate sign-out because they hold donor names. A session that expires keeps them.
 
-## 17. The entry screen is online only until M4, but already shaped for it
+## 17. The entry screen was online only in M3, but already shaped for M4
+
+(Superseded by items 19 and 20.)
 
 Saving needs the network. Offline, Save does not send anything; it says the entry was not saved and that what was typed is kept (the draft). The sticky bar shows a sync status that M4 will fill with pending counts, so the layout won't change.
 
-Donor names come from the event's first 500 donations, through a native `datalist`, which uses the phone's own suggestion UI and needs no custom combobox. Totals in the sticky bar come from the summary endpoint, refreshed after each save, never added up in the browser.
+Donor names come from `GET /events/{id}/donor-names` (every distinct name at the event), through a native `datalist`, which uses the phone's own suggestion UI and needs no custom combobox. Totals in the sticky bar come from the summary endpoint, refreshed after each save, never added up in the browser.
 
 ## 18. Donation edits and stale versions
 
 Editing sends the `version` that was read. A 409 that isn't about a closed event means someone saved first. The form says so, disables Save, and offers "Load the latest version", which reloads the donation into a fresh form. The user then makes their change again. We don't merge automatically: two people correcting the same entry at once is rare, and a silent merge of money is worse than asking.
 
 Status only shows for pledges ("Has this pledge been paid?"). Cash and transfers are always saved as received.
+
+## 19. Offline: the outbox is the save
+
+Saving a donation means writing it to the IndexedDB outbox; the sync engine sends it. The entry screen behaves the same with or without a connection, and the server only ever sees each client id once (or as a duplicate, which counts as done).
+
+The engine sends one event per batch, so one closed event can't hold back the rest. Refusals (closed event, 403, 404, a 400 that survives splitting) mark entries "needs attention" with a plain reason; the user fixes the cause (an admin reopens the event) and presses Try again, or downloads a copy and deletes. Connection problems never mark anything: they retry. Undo runs inside the same lock as sending, so an entry can't be undone locally while it is on its way.
+
+Cost: a donation saved online reaches the server a moment after the "Saved" toast. The status bar says "Sending…" and then "All donations sent".
+
+## 20. Offline start: entry kits and one cached page
+
+To open the entry screen with no signal, two things are stored that earlier milestones avoided:
+
+- **Entry kits** (IndexedDB `kits`): per event, its name, closed flag, your role, and the awardee list with last known totals, written whenever the entry screen loads online. Offline, the screen uses the kit and says when it was saved. It is a small, purpose-built snapshot, not a cache of API responses, and totals shown from it are labelled as possibly out of date.
+- **The entry screen's HTML** in the service worker (cache `ovation-entry-pages`, network first with a 6-second timeout). It is a client shell with no organisation data. A new build deletes the cache, so old HTML never refers to scripts the new build removed. All other pages stay network only.
+
+TanStack Query is told the browser's online state at start (`onlineManager.setOnline(navigator.onLine)`). Otherwise it assumes "online", and an offline start loops: each retry put the organisation page back on its skeleton, which remounted the entry screen, which refetched. Pages treat a query with no data whose last failure was a connection error as unreachable (`isUnreachable`), which also covers Wi-Fi with no internet.
+
+Kits and drafts are cleared on sign-out. The outbox is not (item 21).
+
+**Session end:** the plan was to keep the entry screen usable after a session ends with unsent entries. A session can only end with a server answer (a 401, or the refresh replay window passing while online), so the phone is online at that moment and signing in is possible. The app sends the user to sign in; the outbox is untouched, and the login page says how many donations are waiting. Entries are sent only with the account that recorded them.
+
+## 21. Signing out never deletes unsent donations
+
+Signing out (menu, settings, or all devices) with unsent donations first shows a warning with a CSV copy. Either way, the entries stay on the phone and are sent when the same account signs in again; another account on the same phone sees only a count. Deleting is a separate, confirmed action on the Waiting to send page, for refused entries. Losing a record of money is worse than leaving names on a phone the organiser already holds.
