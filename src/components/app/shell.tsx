@@ -202,7 +202,11 @@ export function Main({ children, narrow }: { children: ReactNode; narrow?: boole
     <main
       id="main"
       tabIndex={-1}
-      className={cn("mx-auto w-full px-4 py-8 outline-none", narrow ? "max-w-lg" : "max-w-5xl")}
+      // Bottom space so the last item can scroll clear of toasts (WCAG 2.4.11).
+      className={cn(
+        "mx-auto w-full px-4 pt-8 pb-32 outline-none",
+        narrow ? "max-w-lg" : "max-w-5xl",
+      )}
     >
       {children}
     </main>

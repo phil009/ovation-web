@@ -170,3 +170,99 @@ export function inviteBody(values: InviteValues): components["schemas"]["CreateI
   if (values.maxUses.trim() !== "") body.maxUses = Number.parseInt(values.maxUses, 10);
   return body;
 }
+
+// ---- donations ---------------------------------------------------------------------------
+
+export type DonationDto = components["schemas"]["DonationDto"];
+export type DonationStatus = components["schemas"]["DonationStatus"];
+export type CreateDonationBody = components["schemas"]["CreateDonationDto"];
+export type UpdateDonationBody = components["schemas"]["UpdateDonationDto"];
+
+/** The awardee select's value for a general donation (for all awardees). */
+export const GENERAL = "";
+
+/** Form values stay strings; `donationCreateBody` and `donationUpdateBody` build the API body. */
+export const donationSchema = z.object({
+  awardeeId: z.string(),
+  // The backend allows 1 to 200 characters (create-donation.dto.ts).
+  donorName: z.string().trim().min(1, v.donorNameRequired).max(200, v.donorNameTooLong),
+  amount: z.string().superRefine((value, ctx) => {
+    const parsed = parseNairaInput(value);
+    if (!parsed.ok) ctx.addIssue({ code: "custom", message: strings.money[parsed.error] });
+  }),
+  paymentMode: z.enum(PAYMENT_MODES),
+  /** Only used when editing a pledge: has it been paid? */
+  status: z.enum(["PLEDGED", "RECEIVED"]),
+  needsReview: z.boolean(),
+  note: z.string().trim().max(500, v.noteTooLong),
+});
+export type DonationValues = z.infer<typeof donationSchema>;
+
+function parsedKobo(amount: string): string {
+  const parsed = parseNairaInput(amount);
+  if (!parsed.ok) throw new Error("donation amount was not validated");
+  return parsed.kobo;
+}
+
+/** The create body. `id` is the client id made when the form opened (safe to retry). */
+export function donationCreateBody(
+  values: DonationValues,
+  ids: { id: string; eventId: string },
+): CreateDonationBody {
+  const body: CreateDonationBody = {
+    id: ids.id,
+    eventId: ids.eventId,
+    awardeeId: values.awardeeId === GENERAL ? null : values.awardeeId,
+    donorName: values.donorName.trim(),
+    amountKobo: parsedKobo(values.amount),
+    paymentMode: values.paymentMode,
+  };
+  if (values.needsReview) body.needsReview = true;
+  const note = values.note.trim();
+  if (note) body.note = note;
+  return body;
+}
+
+/**
+ * The update body, with the version that was read (a stale one gets 409). A pledge keeps
+ * the status chosen in the form; cash and transfers are always received. An empty note is
+ * sent as "" to clear it.
+ */
+export function donationUpdateBody(values: DonationValues, version: number): UpdateDonationBody {
+  return {
+    version,
+    awardeeId: values.awardeeId === GENERAL ? null : values.awardeeId,
+    donorName: values.donorName.trim(),
+    amountKobo: parsedKobo(values.amount),
+    paymentMode: values.paymentMode,
+    status: values.paymentMode === "PLEDGE" ? values.status : "RECEIVED",
+    needsReview: values.needsReview,
+    note: values.note.trim(),
+  };
+}
+
+/**
+ * Did the server keep what we sent? Creating is idempotent on the client id, so a retry
+ * after a lost response, with the form changed in between, returns the first version.
+ */
+export function sameDonation(sent: CreateDonationBody, saved: DonationDto): boolean {
+  return (
+    (sent.awardeeId ?? null) === saved.awardeeId &&
+    sent.donorName === saved.donorName &&
+    sent.amountKobo === saved.amountKobo &&
+    sent.paymentMode === saved.paymentMode
+  );
+}
+
+/** The form values for an existing donation (edit page). */
+export function donationToValues(d: DonationDto): DonationValues {
+  return {
+    awardeeId: d.awardeeId ?? GENERAL,
+    donorName: d.donorName,
+    amount: koboToNairaInput(d.amountKobo),
+    paymentMode: d.paymentMode,
+    status: d.status,
+    needsReview: d.needsReview,
+    note: d.note ?? "",
+  };
+}

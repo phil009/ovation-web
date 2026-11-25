@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, call, connectSession } from "@/lib/api/client";
-import { deletePref } from "@/lib/db";
+import { clearDrafts, deletePref } from "@/lib/db";
 import type { components } from "@/sdk";
 import { loginUrl } from "./redirect";
 import { getSession } from "./session-browser";
@@ -85,11 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // From M4: block this behind a warning when unsynced entries exist.
         await session.logout();
         await clearAppState();
+        await clearDrafts().catch(() => undefined);
       },
       async logoutAll() {
         await call((signal) => api.POST("/api/auth/logout-all", { signal }));
         await session.endLocally("logout", true);
         await clearAppState();
+        await clearDrafts().catch(() => undefined);
       },
       async changePassword(currentPassword, newPassword) {
         const tokens = await call((signal) =>

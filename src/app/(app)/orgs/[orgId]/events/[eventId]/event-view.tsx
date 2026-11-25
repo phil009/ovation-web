@@ -1,11 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Clock, Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, Clock, List, Lock, LockOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { BackLink, Main, PageHeading } from "@/components/app/shell";
+import { BackLink, LinkButton, Main, PageHeading } from "@/components/app/shell";
 import { PageSkeleton } from "@/components/app/route-guard";
 import { ListSkeleton, QueryError, ScrollRegion, Section } from "@/components/app/query-state";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -80,6 +80,19 @@ export function EventView() {
           <p>{strings.event.closedBanner}</p>
         </Notice>
       ) : null}
+
+      <div className="flex flex-wrap gap-3">
+        {canAdd ? (
+          <LinkButton href={`/orgs/${orgId}/events/${eventId}/record`}>
+            <Plus aria-hidden />
+            {strings.record.open}
+          </LinkButton>
+        ) : null}
+        <LinkButton variant="secondary" href={`/orgs/${orgId}/events/${eventId}/donations`}>
+          <List aria-hidden />
+          {strings.donations.all}
+        </LinkButton>
+      </div>
 
       {isAdmin ? <CloseReopen event={data} /> : null}
 
@@ -256,7 +269,12 @@ function SummaryTable({ summary, showActions }: { summary: EventSummary; showAct
               <tr key={a.id}>
                 <td className={cn(cell, "tabular")}>{a.number ?? ""}</td>
                 <th scope="row" className={cn(cell, "font-semibold wrap-break-word")}>
-                  {a.name}
+                  <Link
+                    href={`/orgs/${orgId}/events/${summary.event.id}/donations?awardee=${a.id}`}
+                    className="text-primary underline underline-offset-4 hover:decoration-2"
+                  >
+                    {a.name}
+                  </Link>
                 </th>
                 <td className={cn(cell, "text-right")}>
                   <Money kobo={a.awardeeKobo} />

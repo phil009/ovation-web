@@ -10,6 +10,7 @@ export type MemberDto = components["schemas"]["MemberDto"];
 export type InviteDto = components["schemas"]["InviteDto"];
 export type AuditEntry = components["schemas"]["AuditEntryDto"];
 export type AuditEntity = AuditEntry["entity"];
+export type DonationDto = components["schemas"]["DonationDto"];
 
 /**
  * Query keys. Everything owned by an organisation starts with ['org', orgId], so switching
@@ -22,6 +23,14 @@ export const keys = {
   awardees: (orgId: string, eventId: string) =>
     ["org", orgId, "event", eventId, "awardees"] as const,
   summary: (orgId: string, eventId: string) => ["org", orgId, "event", eventId, "summary"] as const,
+  /** Prefix for every donation list of an event (lists, donor names). */
+  donations: (orgId: string, eventId: string) =>
+    ["org", orgId, "event", eventId, "donations"] as const,
+  donationList: (orgId: string, eventId: string, filters: DonationFilters) =>
+    ["org", orgId, "event", eventId, "donations", "list", filters] as const,
+  donorNames: (orgId: string, eventId: string) =>
+    ["org", orgId, "event", eventId, "donations", "names"] as const,
+  donation: (orgId: string, donationId: string) => ["org", orgId, "donation", donationId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
   invites: (orgId: string) => ["org", orgId, "invites"] as const,
   audit: (orgId: string, filters: AuditFilters) => ["org", orgId, "audit", filters] as const,
@@ -34,6 +43,15 @@ export interface AuditFilters {
 }
 
 export const AUDIT_PAGE_SIZE = 50;
+
+export interface DonationFilters {
+  awardeeId?: string;
+  offset: number;
+}
+
+export const DONATIONS_PAGE_SIZE = 100;
+/** The API's largest page. Donor-name suggestions read the first page of this size. */
+export const DONATIONS_MAX_PAGE = 500;
 
 export const eventsQuery = (orgId: string) =>
   queryOptions({
@@ -80,6 +98,58 @@ export const summaryQuery = (orgId: string, eventId: string) =>
     queryFn: () =>
       call((signal) =>
         api.GET("/api/events/{eventId}/summary", { params: { path: { eventId } }, signal }),
+      ),
+  });
+
+export const donationsQuery = (orgId: string, eventId: string, filters: DonationFilters) =>
+  queryOptions({
+    queryKey: keys.donationList(orgId, eventId, filters),
+    queryFn: () =>
+      call((signal) =>
+        api.GET("/api/donations", {
+          params: {
+            query: {
+              eventId,
+              awardeeId: filters.awardeeId,
+              limit: DONATIONS_PAGE_SIZE,
+              offset: filters.offset,
+            },
+          },
+          signal,
+        }),
+      ),
+  });
+
+/**
+ * Donor names already used at this event, for autocomplete. Reads the first 500 donations
+ * (the API's largest page); later names are not suggested.
+ */
+export const donorNamesQuery = (orgId: string, eventId: string) =>
+  queryOptions({
+    queryKey: keys.donorNames(orgId, eventId),
+    queryFn: async () => {
+      const page = await call((signal) =>
+        api.GET("/api/donations", {
+          params: { query: { eventId, limit: DONATIONS_MAX_PAGE, offset: 0 } },
+          signal,
+        }),
+      );
+      const names = new Map<string, string>();
+      for (const d of page.items) {
+        const key = d.donorName.trim().toLocaleLowerCase("en-GB");
+        if (!names.has(key)) names.set(key, d.donorName.trim());
+      }
+      return [...names.values()].sort((a, b) => a.localeCompare(b, "en-GB"));
+    },
+    staleTime: 60_000,
+  });
+
+export const donationQuery = (orgId: string, donationId: string) =>
+  queryOptions({
+    queryKey: keys.donation(orgId, donationId),
+    queryFn: () =>
+      call((signal) =>
+        api.GET("/api/donations/{id}", { params: { path: { id: donationId } }, signal }),
       ),
   });
 

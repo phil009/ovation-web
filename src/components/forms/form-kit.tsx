@@ -92,6 +92,12 @@ export function useSubmitErrors<T extends FieldValues>(form: UseFormReturn<T>) {
     [form, cooldown],
   );
 
+  /** Shows a message of our own in the error summary (not from an API error). */
+  const failWith = useCallback((message: string) => {
+    setFormError(message);
+    setFocusKey((k) => k + 1);
+  }, []);
+
   const onInvalid = useCallback(() => {
     setFormError(null);
     setFocusKey((k) => k + 1);
@@ -99,5 +105,13 @@ export function useSubmitErrors<T extends FieldValues>(form: UseFormReturn<T>) {
 
   const reset = useCallback(() => setFormError(null), []);
 
-  return { formError, focusKey, fail, onInvalid, reset, coolingDown: cooldown.coolingDown };
+  return {
+    formError,
+    focusKey,
+    fail,
+    failWith,
+    onInvalid,
+    reset,
+    coolingDown: cooldown.coolingDown,
+  };
 }
