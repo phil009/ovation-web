@@ -122,7 +122,7 @@ test("admin: events, awardees, totals, close and reopen, invites, members, audit
   await expect(table.getByRole("rowheader", { name: "Lolo Ada" })).toBeVisible();
   await expect(table.getByText("3,000,000 naira").first()).toBeAttached();
 
-  // A supporter donation (recorded through the API until M3 builds the entry screen).
+  // A supporter donation, through the API (the entry screen is tested in m3.spec.ts).
   const awardees = (await (
     await request.get(`${API_URL}/api/events/${eventId}/awardees`, { headers: admin.headers })
   ).json()) as { id: string; name: string }[];

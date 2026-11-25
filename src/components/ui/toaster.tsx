@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 export interface ToastOptions {
   message: string;
   tone?: "info" | "success" | "error";
-  action?: { label: string; onClick: () => void };
+  /** `accessibleLabel` tells actions apart when several toasts are up; it must start with `label`. */
+  action?: { label: string; accessibleLabel?: string; onClick: () => void };
   /** ms. Toasts with an action stay at least 10 seconds. Infinity keeps it until dismissed. */
   duration?: number;
 }
@@ -114,6 +115,7 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }
       {toast.action ? (
         <Button
           variant="secondary"
+          aria-label={toast.action.accessibleLabel}
           onClick={() => {
             toast.action?.onClick();
             onDismiss();

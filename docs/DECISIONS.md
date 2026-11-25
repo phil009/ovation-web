@@ -85,3 +85,31 @@ Awardee forms keep their values as strings and convert them in `awardeeBody` (te
 ## 14. Wide tables scroll inside a focusable region
 
 The totals and audit tables are real `<table>`s, which are too wide for a phone. They sit in `ScrollRegion`, which is `role="region"`, labelled by the table caption, `tabIndex={0}` so keyboard users can scroll it (axe: scrollable-region-focusable), and `position: relative`. That last part matters. Screen-reader-only text is absolutely positioned, and without a positioned ancestor it escapes the scroll box and widens the whole page on phones. The M2 end-to-end tests now fail if any page scrolls sideways. jsx-a11y's `no-noninteractive-tabindex` allows the `region` role for this.
+
+## 15. Donations: per awardee or general, and who can change them
+
+Each awardee has their own donation (on the awardee) and any number of supporter donations (`awardeeId` set). A general donation (`awardeeId: null`) is for the event as a whole. The backend lets editors create donations but only admins edit or delete them, so:
+
+- the entry screen is for editors and admins;
+- the 10-second Undo after a save shows for admins only. Editors can flag an entry with "Check this entry later" instead, and see a note to ask an admin. A backend change is suggested in BACKEND-ISSUES.md (item 6);
+- the donations list is for every role; Edit (and Delete, on the edit page) is for admins.
+
+## 16. A donation's client id lives as long as the entry, and a changed retry is caught
+
+The entry form makes a `crypto.randomUUID()` when it opens and keeps it, in the IndexedDB draft too, until the server confirms the save. A retry, even after a reload, is the same donation, and the backend's idempotent create can't save it twice.
+
+The catch: if the response was lost and the user changed the form before retrying, the backend returns the first version unchanged. So after every save the app compares what it sent with what came back (`sameDonation`). If they differ, it says the earlier version was saved, keeps the new values, and gives them a new id, so saving again adds them as a separate donation. Nothing is silently dropped or doubled.
+
+Drafts (`drafts` table, one per event) are restored only for the same user, and cleared on a deliberate sign-out because they hold donor names. A session that expires keeps them.
+
+## 17. The entry screen is online only until M4, but already shaped for it
+
+Saving needs the network. Offline, Save does not send anything; it says the entry was not saved and that what was typed is kept (the draft). The sticky bar shows a sync status that M4 will fill with pending counts, so the layout won't change.
+
+Donor names come from the event's first 500 donations, through a native `datalist`, which uses the phone's own suggestion UI and needs no custom combobox. Totals in the sticky bar come from the summary endpoint, refreshed after each save, never added up in the browser.
+
+## 18. Donation edits and stale versions
+
+Editing sends the `version` that was read. A 409 that isn't about a closed event means someone saved first. The form says so, disables Save, and offers "Load the latest version", which reloads the donation into a fresh form. The user then makes their change again. We don't merge automatically: two people correcting the same entry at once is rare, and a silent merge of money is worse than asking.
+
+Status only shows for pledges ("Has this pledge been paid?"). Cash and transfers are always saved as received.

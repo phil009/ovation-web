@@ -1,6 +1,6 @@
 # Roadmap
 
-M0 (foundation), M1 (auth and organisations) and M2 (events, awardees, totals and admin screens) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
+M0 (foundation), M1 (auth and organisations), M2 (events, awardees, totals and admin screens) and M3 (donations) are built. This is the plan for the rest. Each milestone ships behind the same rules: SDK types only, kobo strings, `['org', orgId, …]` query keys, axe-clean in both themes.
 
 ## M2: Events, awardees, summary, then admin screens (built)
 
@@ -21,20 +21,26 @@ What was built, and where it differs from the plan:
 - **Not built:** renaming the organisation (`PATCH /orgs/{orgId}`). It's a small form; add it with the M5 polish.
 - **Tests:** `e2e/m2.spec.ts` covers an admin and a viewer, with axe and a no-sideways-scroll check on every page.
 
-## M3: The entry screen (online only)
+## M3: Donations (built)
 
-- A sticky awardee header with the live running total, announced through `useAnnounce` and debounced.
-- An amount field:
-  - `inputmode="numeric"`, parsed by `parseNairaInput`, formatted live;
-  - a plain-words line for amounts of 100,000 naira and above ("one hundred thousand naira");
-  - quick chips for 10k, 20k, 50k, 100k, 200k and 500k.
-- Donor name with autocomplete from the event's earlier donors (a native `datalist` or a Radix combobox).
-- A Cash / Transfer / Pledge radio group, defaulting to Transfer.
-- Save on Enter or one large button. That clears the form and returns focus to the name field.
-- A 10 second Undo toast. Undo is a soft delete (`DELETE /donations/{id}`).
-- `crypto.randomUUID()` is created when the form opens and reused on every retry. Editing sends `version`; a 409 offers to reload.
-- An always-visible sync status, even though M3 is online only, so M4 fits in without a redesign.
-- Drafts survive closing the app (IndexedDB `drafts` table).
+How donations work in the backend: each awardee has their own donation (on the awardee) and any number of supporter donations. A general donation has no awardee and counts for the whole event. Editors and admins create; only admins edit or delete; everyone can list.
+
+What was built, and where it differs from the plan:
+
+- **The entry screen** (`/orgs/{orgId}/events/{eventId}/record`, editors and admins, open events):
+  - "Who is it for?" picks an awardee (in notebook order) or General. It stays chosen between entries.
+  - A sticky bar with who is being recorded for, their running total (from the summary) and a sync status. The new total is announced once after each save.
+  - The amount: `inputmode="numeric"`, parsed by `parseNairaInput`, read back as "= ₦150,000" and, from 100,000 naira, in words ("one hundred and fifty thousand naira"). Quick amounts for 10k, 20k, 50k, 100k, 200k and 500k.
+  - The donor's name, with suggestions from the event's earlier donors (a native `datalist`).
+  - Cash / Transfer / Pledge, defaulting to Transfer, kept between entries.
+  - "Note or check later" (folded): the `needsReview` flag and a note of up to 500 characters.
+  - Save with Enter or the large button. The form clears, keeps the awardee and payment mode, and focus returns to the donor's name.
+  - Undo for 10 seconds, **admins only** (the backend lets only admins delete; see BACKEND-ISSUES.md, item 6). "Saved on this phone just now" lists the last 10 entries for a quick check.
+  - Client ids and drafts: DECISIONS.md, items 16 and 17.
+- **The donations list** (`…/donations`, every role): oldest first, 100 a page, filtered by awardee through `?awardee=`. Each entry shows who it's for, the mode, Pledged or Received, the "Check later" flag and the note. Awardee names in the totals table link to their donations.
+- **Edit donation** (`…/donations/{id}`, admins, open events): every field, plus "Has this pledge been paid?" for pledges. Sends `version`; a 409 offers "Load the latest version". Delete is on the same page.
+- **Not built:** a list of general donations on their own (the API can't filter them; BACKEND-ISSUES.md, item 7). The pledge follow-up view stays in M5.
+- **Tests:** `src/lib/m3-helpers.test.ts` (amounts in words, bodies, retries) and `e2e/m3.spec.ts` (admin and editor, axe and no sideways scroll on every new page).
 
 ## M4: Offline outbox and sync
 
@@ -43,7 +49,7 @@ Folder design (not built yet):
 ```
 src/lib/offline/
   db.ts          Dexie tables: outbox (donation + eventId + status + attempts + lastError),
-                 drafts, donorNames (per event, for autocomplete)
+                 donorNames (per event, for autocomplete). `drafts` exists since M3 (src/lib/db.ts)
   outbox.ts      enqueue(donation) -> writes IndexedDB first, then tries to send
   sync.ts        drains the outbox in batches of up to 500 to POST /donations/batch;
                  marks `created` and `duplicates` as done (idempotent on client ids);
@@ -69,7 +75,7 @@ Rules:
 ## M5: Export, pledges, polish
 
 - An "Export to Excel" button: `GET /events/{id}/export.xlsx` with `parseAs: 'blob'`, downloaded with a sanitised file name (event name, letters, digits and dashes).
-- A pledge follow-up view: pledged donations by awardee, a "Mark received" action for admins (PATCH with `version`).
+- A pledge follow-up view: pledged donations by awardee, a "Mark received" action for admins (PATCH with `version`). The edit page can already mark a single pledge as paid.
 - Performance:
   - bundle analysis;
   - route-level code splitting;

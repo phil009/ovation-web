@@ -49,6 +49,22 @@ class-validator enforces them, but `@ApiProperty` doesn't declare them, so the g
 
 **Fix:** declare them as `{ type: 'object', additionalProperties: true, nullable: true }` so they generate as `Record<string, unknown> | null`.
 
+### 6. Editors can't undo or correct their own donations
+
+`donations.controller.ts`: `PATCH` and `DELETE /donations/{id}` need `ADMIN`. Editors do most of the typing at an event, so the 10-second Undo after a save only works for admins. An editor who mistypes has to find an admin.
+
+**Frontend now:** Undo shows for admins only. Editors see a note saying to tick "Check this entry later" or ask an admin.
+
+**Fix (suggested):** let the creator delete (and perhaps edit) their own donation within a short window, for example 10 minutes after `createdAt`, while the event is open. Admins keep full rights. Record it in the audit log as usual.
+
+### 7. The donations list can't filter general donations, and only sorts oldest first
+
+`list-donations.query.ts`: `awardeeId` filters by one awardee, but there is no way to ask for general donations only (`awardeeId` null). The list is always oldest first, and there is no donor-name search.
+
+**Frontend now:** general donations only appear in the "Everyone" list, labelled General. Donor-name suggestions read the first 500 donations of the event (one page of the largest size), so names after that are not suggested.
+
+**Fix (suggested):** accept `awardeeId=general` (or a `general=true` flag), an `order=desc` option, and a `q` donor-name search. A small `GET /events/{id}/donor-names` (distinct names) would make autocomplete exact and cheap.
+
 ## Done
 
 - Retrying a lost refresh: the same replacement comes back within 2 minutes (migration `20261124150000_refresh_token_replay`).
